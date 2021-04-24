@@ -1,0 +1,677 @@
+
+;###############################################
+;                                              #
+; A* SEARCH ALGORITHM FOR AMIGA BLITZ BASIC 2  #
+;                                              #
+; DEVELOPED BY CARMELO MAIOLINO (C) APRIL 2021 #
+;                                              #
+;###############################################
+
+
+;## SETTING UP ################################
+
+
+;   DEFINE GRID DIMENSIONS ROW AND COL
+;
+
+    #ROW = 10
+    #COL = 8
+
+
+;   FROM YOUR MAIN PROGRAM, POPULATE THE
+;
+;   grid() ARRAY FILLING IT WITH 0s AND 1s
+
+;   1 IS USED FOR UNBLOCKED CELL
+;
+;   0 IS USED FOR BLOCKED CELL
+
+
+
+;   CALL aStarSearch{x1,y1,x2,y2} TO FIND A PATH
+
+;   IF A PATH IS FOUND, THE RESULT CAN BE FOUND
+
+;   IN THE Path() LIST
+
+
+
+
+;#############################################
+
+  ; THE GLOBAL ARRAY OF YOUR GAME
+
+    Dim grid(#ROW,#COL)
+
+
+; INTERNAL STRUCTURES AND FUNCTIONS
+
+
+
+#MAX_NUMBER = 10000
+
+NEWTYPE.Pair
+  X.w
+  Y.w
+End NEWTYPE
+
+
+NEWTYPE.Cell
+  parent_i.w
+  parent_j.w
+  f.f
+  g.f
+  h.f
+End NEWTYPE
+
+
+NEWTYPE.SET
+  f.f
+  p.Pair
+End NEWTYPE
+
+
+; THIS IS THE GLOBAL LIST THAT CONTAINS THE PATH, IF ANY
+
+Dim List path.Pair(#MAX_NUMBER)
+
+
+Dim closedList(#ROW,#COL)
+
+
+; The Grid containing the node structures
+
+Dim cellDetails.Cell(#ROW,#COL)
+
+Dim List openList.SET(#MAX_NUMBER)
+
+
+
+Function isValid{row,col}
+  If ((row>=0) AND (row<#ROW) AND (col>=0) AND (col <#COL) )
+    Function Return 1
+  Else
+    Function Return 0
+  EndIf
+End Function
+
+
+Function isUnblocked{row,col}
+  SHARED grid()
+
+  If (grid(row,col)=1)
+    Function Return 1
+  Else
+    Function Return 0
+  EndIf
+End Function
+
+
+Function isDestination{row,col,destX, destY}
+
+  If (row=destX AND col=destY)
+    Function Return 1
+  Else
+    Function Return 0
+  EndIf
+End Function
+
+
+Function calculateHValue{row, col, destX, destY}
+  Function Return Sqr(row-destX)* (row-destX) + (col-destY) * (col-destY)
+
+End Function
+
+
+Function isOpenListEmpty{}
+
+  SHARED openList()
+
+  ResetList openList()
+
+  i=0
+  While NextItem(openList())
+    i=i+1
+  Wend
+
+  ResetList openList()
+
+  s=FirstItem(openList())
+
+  If (i=0)
+    Function Return 0
+
+  Else
+    Function Return i
+
+  EndIf
+
+End Function
+
+
+
+; ############### GLOBAL FUNCTIONS #####################
+
+
+
+; THIS INITIALIZE THE GRID OF GAME
+
+; 1 = CELL IS UNBLOCKED
+; 0 = CELL IS BLOCKED
+
+; FILL THE GLOBAL GRID ARRAY WITH 1 OR 0
+
+; THESE VALUES MUST BE READ FROM FILE BASED ON GRID MAP
+
+; FOR CONVENIENCE AND DEMO PURPOSE ALL CELLS ARE SET TO 1
+
+Statement initializeGrid{}
+  SHARED grid()
+  For i=0 To #ROW -1
+    For j=0 To #COL -1
+      grid(i,j)=1
+
+    Next j
+  Next i
+
+End Statement
+
+
+
+; THIS IS THE FUNCTION RESPONSIBLE TO WRITE DOWN THE PATH IF FOUND
+
+
+Statement tracePath{startX, startY, goalX, goalY}
+
+  SHARED path()
+  SHARED cellDetails()
+
+  row=goalX
+  col=goalY
+
+  While(NOT (cellDetails(row,col)\parent_i = row AND cellDetails(row,col)\parent_j =col  ))
+    result = AddFirst(path())
+    path()\X=row
+    path()\Y=col
+
+    temp_row = cellDetails(row,col)\parent_i
+    temp_col = cellDetails(row,col)\parent_j
+
+    row = temp_row
+    col = temp_col
+
+  Wend
+
+  result = AddFirst(path())
+  path()\X=row
+  path()\Y=col
+
+  ;ResetList path()
+  ;While NextItem(path())
+
+    ;NPrint "-> (" + Str$(path()\X) + ","+ Str$(path()\Y) + ")"
+
+  ;Wend
+
+End Statement
+
+
+
+Statement resetPath{}
+  SHARED path()
+  ClearList path()
+
+End Statement
+
+
+Statement printPath{}
+
+  SHARED path()
+
+  ResetList path()
+  While NextItem(path())
+
+    NPrint "-> (" + Str$(path()\X) + ","+ Str$(path()\Y) + ")"
+
+  Wend
+
+
+End Statement
+
+
+
+
+; THE MAIN FUNCTION RESPONSIBLE TO SEARCH THE PATH
+
+
+Function aStarSearch{startX, startY, goalX, goalY}
+
+  SHARED cellDetails()
+  SHARED openList()
+  SHARED closedList()
+  SHARED path()
+
+  If (isValid{startX,startY}=0)
+    NPrint "Source is invalid"
+    Goto exit
+  EndIf
+
+
+  If (isValid{goalX,goalY}=0)
+    NPrint "Destination is invalid"
+    Goto exit
+  EndIf
+
+  If (isUnblocked{startX,startY}=0 OR isUnblocked{goalX,goalY}=0 )
+
+    NPrint "Source or destination is blocked"
+    Goto exit
+  EndIf
+
+
+  If (isDestination{startX,startY,goalX,goalY}=1)
+    NPrint "We are already at the destination"
+    Goto exit
+  EndIf
+
+
+  ; Clear the Array of closed list
+
+  For i=0 To #ROW-1
+    For j=0 To #COL-1
+      closedList(i,j)=0
+    Next j
+  Next i
+
+
+  ; clear the Array cellDetails
+
+  For i=0 To #ROW-1
+
+    For j=0 To #COL-1
+      cellDetails(i,j)\f=#MAX_NUMBER
+      cellDetails(i,j)\g=#MAX_NUMBER
+      cellDetails(i,j)\h=#MAX_NUMBER
+      cellDetails(i,j)\parent_i=-1
+      cellDetails(i,j)\parent_j=-1
+    Next j
+  Next i
+
+
+  ; Reset the Path list that will contains path nodes
+
+  resetPath{}
+
+
+  ;Initialize the parameters of the starting node
+
+  i=startX
+  j=startY
+
+  cellDetails(i,j)\f=0.0
+  cellDetails(i,j)\g=0.0
+  cellDetails(i,j)\h=0.0
+  cellDetails(i,j)\parent_i=i
+  cellDetails(i,j)\parent_j=j
+
+  ;Put the starting cell on the open list
+
+  result=AddLast(openList())
+  openList()\f=0.0
+  openList()\p\X=i
+  openList()\p\Y=j
+
+  ;We set to 0 as initially the destination is not reached
+
+  foundDest=0
+
+
+  While isOpenListEmpty{}>0
+
+    i= openList()\p\X
+    j= openList()\p\Y
+
+    KillItem openList()
+
+    closedList(i,j)=1
+
+
+    ; 1ST SUCCESSOR
+
+    If(isValid{i-1,j}=1)
+
+      If(isDestination{i-1,j,goalX,goalY}=1)
+        cellDetails(i-1,j)\parent_i=i
+        cellDetails(i-1,j)\parent_j=j
+        ;NPrint "The destination cell is found"
+        foundDest=1
+        Goto exit
+      Else
+         If (closedList(i-1,j)=0 AND isUnblocked{i-1,j}=1)
+
+            gNew=cellDetails(i,j)\g+1.0
+            hNew=calculateHValue{i-1,j, goalX, goalY}
+            fNew=gNew+hNew
+
+            If(cellDetails(i-1,j)\f=#MAX_NUMBER OR cellDetails(i-1,j)\f > fNew)
+
+                result=AddLast(openList())
+                openList()\f=fNew
+                openList()\p\X=i-1
+                openList()\p\Y=j
+
+                cellDetails(i-1,j)\f=fNew
+                cellDetails(i-1,j)\g=gNew
+                cellDetails(i-1,j)\h=hNew
+                cellDetails(i-1,j)\parent_i=i
+                cellDetails(i-1,j)\parent_j=j
+
+            EndIf
+         EndIf
+      EndIf
+    EndIf
+
+
+
+    ; 2ND SUCCESSOR
+
+    If(isValid{i+1,j}=1)
+
+      If(isDestination{i+1,j,goalX,goalY}=1)
+        cellDetails(i+1,j)\parent_i=i
+        cellDetails(i+1,j)\parent_j=j
+        ;NPrint "The destination cell is found"
+        foundDest=1
+        Goto exit
+      Else
+        If(closedList(i+1,j)=0 AND isUnblocked{i+1,j}=1)
+
+          gNew=cellDetails(i,j)\g+1.0
+          hNew=calculateHValue{i+1,j, goalX, goalY}
+          fNew=gNew+hNew
+
+          If(cellDetails(i+1,j)\f=#MAX_NUMBER OR cellDetails(i+1,j)\f > fNew)
+
+            result= AddLast(openList())
+            openList()\f=fNew
+            openList()\p\X=i+1
+            openList()\p\Y=j
+
+            cellDetails(i+1,j)\f=fNew
+            cellDetails(i+1,j)\g=gNew
+            cellDetails(i+1,j)\h=hNew
+            cellDetails(i+1,j)\parent_i=i
+            cellDetails(i+1,j)\parent_j=j
+
+          EndIf
+        EndIf
+      EndIf
+    EndIf
+
+
+
+    ; 3RD SUCCESSOR
+
+    If(isValid{i,j+1}=1)
+
+      If(isDestination{i,j+1,goalX,goalY}=1)
+        cellDetails(i,j+1)\parent_i=i
+        cellDetails(i,j+1)\parent_j=j
+        ;NPrint "The destination cell is found"
+        foundDest=1
+        Goto exit
+      Else
+        If(closedList(i,j+1)=0 AND isUnblocked{i,j+1}=1)
+
+          gNew=cellDetails(i,j)\g+1.0
+          hNew=calculateHValue{i,j+1, goalX, goalY}
+          fNew=gNew+hNew
+
+          If(cellDetails(i,j+1)\f=#MAX_NUMBER OR cellDetails(i,j+1)\f > fNew)
+
+            result= AddLast(openList())
+            openList()\f=fNew
+            openList()\p\X=i
+            openList()\p\Y=j+1
+
+            cellDetails(i,j+1)\f=fNew
+            cellDetails(i,j+1)\g=gNew
+            cellDetails(i,j+1)\h=hNew
+            cellDetails(i,j+1)\parent_i=i
+            cellDetails(i,j+1)\parent_j=j
+
+          EndIf
+        EndIf
+      EndIf
+    EndIf
+
+
+
+
+    ; 4TH SUCCESSOR
+
+    If(isValid{i,j-1}=1)
+
+      If(isDestination{i,j-1,goalX,goalY}=1)
+        cellDetails(i,j-1)\parent_i=i
+        cellDetails(i,j-1)\parent_j=j
+        ;NPrint "The destination cell is found"
+        foundDest=1
+        Goto exit
+      Else
+
+        If(closedList(i,j-1)=0 AND isUnblocked{i,j-1}=1)
+          gNew=cellDetails(i,j)\g+1.0
+          hNew=calculateHValue{i,j-1, goalX, goalY}
+          fNew=gNew+hNew
+
+          If(cellDetails(i,j-1)\f=#MAX_NUMBER OR cellDetails(i,j-1)\f > fNew)
+
+            result= AddLast(openList())
+            openList()\f=fNew
+            openList()\p\X=i
+            openList()\p\Y=j-1
+
+            cellDetails(i,j-1)\f=fNew
+            cellDetails(i,j-1)\g=gNew
+            cellDetails(i,j-1)\h=hNew
+            cellDetails(i,j-1)\parent_i=i
+            cellDetails(i,j-1)\parent_j=j
+
+          EndIf
+        EndIf
+      EndIf
+    EndIf
+
+
+
+    ; 5TH SUCCESSOR
+
+    If(isValid{i-1,j+1}=1)
+
+      If(isDestination{i-1,j+1,goalX,goalY}=1)
+        cellDetails(i-1,j+1)\parent_i=i
+        cellDetails(i-1,j+1)\parent_j=j
+        ;NPrint "The destination cell is found"
+        foundDest=1
+        Goto exit
+      Else
+
+        If(closedList(i-1,j+1)=0 AND isUnblocked{i-1,j+1}=1)
+          gNew=cellDetails(i,j)\g+1.414
+          hNew=calculateHValue{i-1,j+1, goalX, goalY}
+          fNew=gNew+hNew
+
+          If(cellDetails(i-1,j+1)\f=#MAX_NUMBER OR cellDetails(i-1,j+1)\f > fNew)
+
+            result= AddLast(openList())
+            openList()\f=fNew
+            openList()\p\X=i-1
+            openList()\p\Y=j+1
+
+            cellDetails(i-1,j+1)\f=fNew
+            cellDetails(i-1,j+1)\g=gNew
+            cellDetails(i-1,j+1)\h=hNew
+            cellDetails(i-1,j+1)\parent_i=i
+            cellDetails(i-1,j+1)\parent_j=j
+
+          EndIf
+        EndIf
+      EndIf
+    EndIf
+
+
+
+    ; 6TH SUCCESSOR
+
+    If(isValid{i-1,j-1}=1)
+
+      If(isDestination{i-1,j-1,goalX,goalY}=1)
+        cellDetails(i-1,j-1)\parent_i=i
+        cellDetails(i-1,j-1)\parent_j=j
+        ;NPrint "The destination cell is found"
+        foundDest=1
+        Goto exit
+      Else
+
+        If(closedList(i-1,j-1)=0 AND isUnblocked{i-1,j-1}=1)
+          gNew=cellDetails(i,j)\g+1.414
+          hNew=calculateHValue{i-1,j-1, goalX, goalY}
+          fNew=gNew+hNew
+
+          If(cellDetails(i-1,j-1)\f=#MAX_NUMBER OR cellDetails(i-1,j-1)\f > fNew)
+
+            result= AddLast(openList())
+            openList()\f=fNew
+            openList()\p\X=i-1
+            openList()\p\Y=j-1
+
+            cellDetails(i-1,j-1)\f=fNew
+            cellDetails(i-1,j-1)\g=gNew
+            cellDetails(i-1,j-1)\h=hNew
+            cellDetails(i-1,j-1)\parent_i=i
+            cellDetails(i-1,j-1)\parent_j=j
+
+          EndIf
+        EndIf
+      EndIf
+    EndIf
+
+
+
+    ; 7TH SUCCESSOR
+
+    If(isValid{i+1,j+1}=1)
+
+      If(isDestination{i+1,j+1,goalX,goalY}=1)
+        cellDetails(i+1,j+1)\parent_i=i
+        cellDetails(i+1,j+1)\parent_j=j
+        ;NPrint "The destination cell is found"
+        foundDest=1
+        Goto exit
+      Else
+
+        If(closedList(i+1,j+1)=0 AND isUnblocked{i+1,j+1}=1)
+          gNew=cellDetails(i,j)\g+1.414
+          hNew=calculateHValue{i+1,j+1, goalX, goalY}
+          fNew=gNew+hNew
+
+          If(cellDetails(i+1,j+1)\f=#MAX_NUMBER OR cellDetails(i+1,j+1)\f > fNew)
+
+            result= AddLast(openList())
+            openList()\f=fNew
+            openList()\p\X=i+1
+            openList()\p\Y=j+1
+
+            cellDetails(i+1,j+1)\f=fNew
+            cellDetails(i+1,j+1)\g=gNew
+            cellDetails(i+1,j+1)\h=hNew
+            cellDetails(i+1,j+1)\parent_i=i
+            cellDetails(i+1,j+1)\parent_j=j
+
+          EndIf
+        EndIf
+      EndIf
+    EndIf
+
+
+
+     ; 8TH SUCCESSOR
+
+    If(isValid{i+1,j-1}=1)
+
+      If(isDestination{i+1,j-1,goalX,goalY}=1)
+        cellDetails(i+1,j-1)\parent_i=i
+        cellDetails(i+1,j-1)\parent_j=j
+        ;NPrint "The destination cell is found"
+        foundDest=1
+        Goto exit
+      Else
+
+        If(closedList(i+1,j-1)=0 AND isUnblocked{i+1,j-1}=1)
+          gNew=cellDetails(i,j)\g+1.414
+          hNew=calculateHValue{i+1,j-1, goalX, goalY}
+          fNew=gNew+hNew
+
+          If(cellDetails(i+1,j-1)\f=#MAX_NUMBER OR cellDetails(i+1,j-1)\f > fNew)
+
+            result= AddLast(openList())
+            openList()\f=fNew
+            openList()\p\X=i+1
+            openList()\p\Y=j-1
+
+            cellDetails(i+1,j-1)\f=fNew
+            cellDetails(i+1,j-1)\g=gNew
+            cellDetails(i+1,j-1)\h=hNew
+            cellDetails(i+1,j-1)\parent_i=i
+            cellDetails(i+1,j-1)\parent_j=j
+
+          EndIf
+        EndIf
+      EndIf
+    EndIf
+
+  Wend
+
+  .exit
+
+
+  ; Clears all internal Lists
+
+  ; Please note, the list Path is not cleared
+  ; because is globally shared
+
+
+  ClearList openList()
+
+  If (foundDest=0)
+    Function Return 0
+  Else
+    tracePath{startX,startY, goalX, goalY}
+    Function Return 1
+  EndIf
+
+
+End Function
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

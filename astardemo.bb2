@@ -1,0 +1,70 @@
+INCLUDE "astar.bb2"
+
+
+
+;###################### DEMO PROGRAM ##########################################
+;                                                                             #
+; This program demonstrate the use of A* algorith using the astar.bb2 module  #
+;                                                                             #
+; developed by Carmelo Maiolino in April 2021.                                #
+;                                                                             #
+; Please note, this demo assumes we're working on a screen with a resolution  #
+;                                                                             #
+; 320x256 dividing the screen into blocks of 32x32 pixels.                    #
+;                                                                             #
+; This way we're managing a 10 ROWS and 8 COLS.                               #
+;                                                                             #
+;                                                                             #
+;##############################################################################
+
+
+; Populate the global grid() array defined in the astar library
+;
+; ROW(10) AND COLS(8) are constants defined in the astar module,if you want
+;
+; to use other values, you need to change them within the aStar module
+
+
+For j=0 To #COL-1
+  For i=0 To #ROW-1
+    Read grid(i,j)
+  Next
+Next
+
+
+; Define the Grid data 1 block is free, 0 is locked
+; in real game, these data are read from file
+
+Data 1,1,1,1,1,1,1,1,1,1
+Data 0,1,1,1,1,1,1,1,0,1
+Data 1,1,1,1,1,1,1,1,1,1
+Data 1,1,0,1,1,1,0,1,1,1
+Data 1,1,1,1,1,1,1,1,1,1
+Data 1,1,1,1,1,1,1,1,1,1
+Data 1,1,1,1,1,1,0,1,1,1
+Data 1,1,1,1,1,1,1,1,1,1
+
+
+
+; aStarSearch try to find the path, if it finds
+; the result is contained in the global list path()
+
+NPrint "Search from node (0,0) to (9,7)"
+
+result=aStarSearch{0,0,9,7}
+
+If (result=1)
+  printPath{}
+Else
+  NPrint "Sorry, no path found"
+EndIf
+
+
+MouseWait
+End
+
+
+
+
+
+
